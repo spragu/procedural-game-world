@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>procedural_game_world</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="WorldGenerator.App\**\*.cs" />
+    <EmbeddedResource Remove="WorldGenerator.App\**\*" />
+    <None Remove="WorldGenerator.App\**\*" />
+  </ItemGroup>
+
+</Project>
