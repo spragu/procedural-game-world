@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+
+    <!--
+      World generation is embarrassingly parallel per row. The interpreted
+      development runtime is kept single-threaded; Release uses WebAssembly
+      threads and scales with navigator.hardwareConcurrency.
+    -->
+    <WasmEnableThreads Condition="'$(Configuration)' == 'Release'">true</WasmEnableThreads>
+
+    <!--
+      Blazor runs IL through an interpreter by default, which for this kind of
+      tight float maths is roughly 50x slower than native. AOT compiles the hot
+      paths to real WebAssembly. Measured on a 2048x2048 world: 48 s interpreted.
+      Applies to `dotnet publish` only - `dotnet run` is always interpreted.
+    -->
+    <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
+    <WasmEnableSIMD>true</WasmEnableSIMD>
+
+    <!-- 4096 worlds peak near 535 MB; stay below WASM helper modules' 2 GB limit. -->
+    <EmccMaximumHeapSize>2147483648</EmccMaximumHeapSize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.10" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProceduralWorld.Core\ProceduralWorld.Core.csproj" />
+  </ItemGroup>
+
+</Project>
