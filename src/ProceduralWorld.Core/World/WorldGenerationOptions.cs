@@ -31,15 +31,18 @@ public sealed record WorldGenerationOptions
     public ContinentShape Shape { get; init; } = ContinentShape.Continent;
 
     /// <summary>
-    /// Fraction of the map's half-extent reserved as guaranteed open ocean on the rim.
-    /// 0.18 means the outer ~18% fades to deep water.
+    /// Normalised distance from each map edge reserved as guaranteed open ocean.
+    /// 0.18 means the outer 18% fades toward deep water.
     /// </summary>
     public float OceanRim { get; init; } = 0.18f;
 
-    /// <summary>Elevation below this is water. Raising it floods the map.</summary>
+    /// <summary>
+    /// Elevation value assigned to the calibrated shoreline. Shape and ocean rim
+    /// determine water coverage; this controls relative land height and water depth.
+    /// </summary>
     public float SeaLevel { get; init; } = 0.42f;
 
-    /// <summary>Base feature size of the terrain. Larger = bigger continents.</summary>
+    /// <summary>Base terrain-noise frequency. Larger values create smaller, busier features.</summary>
     public float TerrainScale { get; init; } = 2.6f;
 
     /// <summary>How hard the coastline is distorted. This is what kills circular islands.</summary>
@@ -57,7 +60,10 @@ public sealed record WorldGenerationOptions
     /// <summary>Global moisture offset in [-1, 1]. Negative = arid world.</summary>
     public float MoistureBias { get; init; }
 
-    /// <summary>How many river sources to attempt. Set to 0 to disable hydrology.</summary>
+    /// <summary>
+    /// Target river sources for the world. Map dimensions change raster resolution,
+    /// not this count. Set to 0 to disable rivers and hydrology-created lakes.
+    /// </summary>
     public int RiverCount { get; init; } = 42;
 
     /// <summary>

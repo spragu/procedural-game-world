@@ -13,9 +13,9 @@
 
 using Microsoft.AspNetCore.StaticFiles;
 
-string webRoot = Path.GetFullPath(
-    args.FirstOrDefault(a => !a.StartsWith('-'))
-    ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"));
+string requestedWebRoot = args.FirstOrDefault(a => !a.StartsWith('-'))
+    ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+string webRoot = ResolveWebRoot(requestedWebRoot);
 
 if (!Directory.Exists(webRoot))
 {
@@ -59,3 +59,18 @@ Console.WriteLine($"Serving {webRoot}");
 app.Run();
 
 return 0;
+
+static string ResolveWebRoot(string requestedPath)
+{
+    if (Path.IsPathRooted(requestedPath)) return Path.GetFullPath(requestedPath);
+
+    for (DirectoryInfo? directory = new(Directory.GetCurrentDirectory());
+         directory is not null;
+         directory = directory.Parent)
+    {
+        string candidate = Path.GetFullPath(Path.Combine(directory.FullName, requestedPath));
+        if (Directory.Exists(candidate)) return candidate;
+    }
+
+    return Path.GetFullPath(requestedPath);
+}

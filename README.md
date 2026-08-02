@@ -62,8 +62,9 @@ Then open the URL printed by the host. The publish step is what fingerprints the
 asset names into `index.html`, which is why the client is published separately
 rather than referenced by the host.
 
-AOT makes a large difference: a 2048×2048 world takes roughly 48 s interpreted
-versus a fraction of that compiled.
+AOT makes a large difference: the interpreted development build can take about
+10 s for even the default 512×320 world. On a 16-core development machine, the
+threaded AOT build generated a 4096×4096 world in about 3.4 s.
 
 ### Benchmark
 
@@ -79,7 +80,7 @@ Prints tiles, generation time, overview render time, and peak managed memory for
 - Release builds enable `WasmEnableThreads`; the browser needs `SharedArrayBuffer`,
   which requires cross-origin isolation headers. Serving the published output from
   a plain static file server without those headers will fail to boot.
-- The maximum heap is raised to 4 GB to accommodate the largest worlds.
-- All generator knobs live in
-  [src/ProceduralWorld.Core/World/WorldGenerationOptions.cs](src/ProceduralWorld.Core/World/WorldGenerationOptions.cs)
-  and are documented there.
+- The maximum heap is capped at 2 GB for compatibility with WASM helper modules;
+  a 4096×4096 world peaks near 535 MB of managed memory.
+- Generator passes, parameter ranges, and tuning interactions are documented in
+  [docs/generator-parameters.md](docs/generator-parameters.md).

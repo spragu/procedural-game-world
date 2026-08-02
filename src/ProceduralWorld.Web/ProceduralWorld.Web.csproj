@@ -22,8 +22,8 @@
     <RunAOTCompilation Condition="'$(Configuration)' == 'Release'">true</RunAOTCompilation>
     <WasmEnableSIMD>true</WasmEnableSIMD>
 
-    <!-- Large worlds need well past the default address space headroom. -->
-    <EmccMaximumHeapSize>4294967296</EmccMaximumHeapSize>
+    <!-- 4096 worlds peak near 535 MB; stay below WASM helper modules' 2 GB limit. -->
+    <EmccMaximumHeapSize>2147483648</EmccMaximumHeapSize>
   </PropertyGroup>
 
   <ItemGroup>

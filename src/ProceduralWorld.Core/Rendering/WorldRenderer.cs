@@ -104,8 +104,8 @@ public static class WorldRenderer
             for (int px = 0; px < pw; px++)
             {
                 int tx = region.X + px * stride;
-                var tile = map.Clamped(tx, ty);
-                var color = ColorOf(map, tile, tx, ty, stride, sea, options);
+                var tile = SampleTile(map, tx, ty, stride, options.View, out int sampleX, out int sampleY);
+                var color = ColorOf(map, tile, sampleX, sampleY, stride, sea, options);
 
                 buffer[o] = color.R;
                 buffer[o + 1] = color.G;
@@ -116,6 +116,41 @@ public static class WorldRenderer
         });
 
         return buffer;
+    }
+
+    private static WorldTile SampleTile(
+        WorldMap map,
+        int x,
+        int y,
+        int stride,
+        MapView view,
+        out int sampleX,
+        out int sampleY)
+    {
+        sampleX = x;
+        sampleY = y;
+        var tile = map.Clamped(x, y);
+
+        if (view != MapView.Biome || stride <= 1 || tile.Biome == BiomeId.River)
+            return tile;
+
+        int maxX = Math.Min(map.Width, x + stride);
+        int maxY = Math.Min(map.Height, y + stride);
+
+        for (int candidateY = y; candidateY < maxY; candidateY++)
+        {
+            for (int candidateX = x; candidateX < maxX; candidateX++)
+            {
+                var candidate = map[candidateX, candidateY];
+                if (candidate.Biome != BiomeId.River) continue;
+
+                sampleX = candidateX;
+                sampleY = candidateY;
+                return candidate;
+            }
+        }
+
+        return tile;
     }
 
     private static Rgb ColorOf(WorldMap map, in WorldTile tile, int x, int y, int stride, float sea, RenderOptions options)

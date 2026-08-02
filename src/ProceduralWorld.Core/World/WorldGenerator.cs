@@ -498,12 +498,11 @@ public static class WorldGenerator
         var shore = f.ShoreDistance;
         var moisture = f.Moisture;
 
-        // River count is authored against the default 512x320 map. Scaling it with
-        // area keeps drainage density constant instead of leaving a 4096x4096 world
-        // with the same four dozen rivers spread impossibly thin.
+        // Terrain is sampled in normalised map space, so larger dimensions increase
+        // raster resolution rather than geographic extent. Keep the requested river
+        // count fixed or high-resolution maps become crowded with duplicate streams.
         long area = (long)w * h;
-        const long ReferenceArea = 512L * 320L;
-        int riverCount = (int)Math.Clamp(o.RiverCount * area / ReferenceArea, o.RiverCount, 20_000);
+        int riverCount = Math.Min(o.RiverCount, 20_000);
 
         // Collecting every eligible tile would be tens of millions of ints on a large
         // world. Stride-sampling keeps the candidate pool bounded while still spreading
@@ -526,31 +525,77 @@ public static class WorldGenerator
 
         if (candidates.Count == 0) return;
 
-        // Deterministic partial shuffle: we only ever consume the first `attempts`
-        // entries, so there is no point shuffling the whole pool on a large map.
-        int attempts = Math.Min(riverCount, candidates.Count);
-        for (int i = 0; i < attempts; i++)
-        {
-            int j = i + (int)(rng.NextUInt() % (uint)(candidates.Count - i));
-            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
-        }
-
         int maxSteps = w + h;
+        int minRiverLength = Math.Max(12, Math.Min(w, h) / 40);
+        int sourceSpacing = Math.Max(8, (int)MathF.Sqrt((float)area / riverCount) / 2);
+        int sourceCellSize = Math.Max(1, sourceSpacing / 2);
+        int sourceCellRadius = (sourceSpacing + sourceCellSize - 1) / sourceCellSize;
+        int sourceGridWidth = (w + sourceCellSize - 1) / sourceCellSize;
+        int sourceGridHeight = (h + sourceCellSize - 1) / sourceCellSize;
+        var sourceGrid = new int[sourceGridWidth * sourceGridHeight];
+        Array.Fill(sourceGrid, -1);
+
         var path = new List<int>(Math.Min(4096, maxSteps));
         var visited = new HashSet<int>();
+        int acceptedRivers = 0;
 
-        for (int r = 0; r < attempts; r++)
+        // Shuffle lazily while scanning candidates. Rejected sources do not consume
+        // the river budget, but the candidate pool stays bounded on very large maps.
+        for (int candidateIndex = 0;
+             candidateIndex < candidates.Count && acceptedRivers < riverCount;
+             candidateIndex++)
         {
-            int current = candidates[r];
+            int shuffledIndex = candidateIndex + (int)(rng.NextUInt() % (uint)(candidates.Count - candidateIndex));
+            (candidates[candidateIndex], candidates[shuffledIndex]) = (candidates[shuffledIndex], candidates[candidateIndex]);
+
+            int current = candidates[candidateIndex];
+            int sourceY = current / w;
+            int sourceX = current - sourceY * w;
+                        int sourceCellX = sourceX / sourceCellSize;
+                        int sourceCellY = sourceY / sourceCellSize;
+            bool sourceTooClose = false;
+
+                        for (int cellY = Math.Max(0, sourceCellY - sourceCellRadius);
+                                 cellY <= Math.Min(sourceGridHeight - 1, sourceCellY + sourceCellRadius) && !sourceTooClose;
+                                 cellY++)
+            {
+                int sourceGridRow = cellY * sourceGridWidth;
+                                for (int cellX = Math.Max(0, sourceCellX - sourceCellRadius);
+                     cellX <= Math.Min(sourceGridWidth - 1, sourceCellX + sourceCellRadius);
+                     cellX++)
+                {
+                    int other = sourceGrid[sourceGridRow + cellX];
+                    if (other < 0) continue;
+
+                    int otherY = other / w;
+                    int otherX = other - otherY * w;
+                    int deltaX = sourceX - otherX;
+                    int deltaY = sourceY - otherY;
+                    if (deltaX * deltaX + deltaY * deltaY < sourceSpacing * sourceSpacing)
+                    {
+                        sourceTooClose = true;
+                        break;
+                    }
+                }
+            }
+
+            if (sourceTooClose || flow[current] >= 128) continue;
+
             path.Clear();
             visited.Clear();
+            bool reachesDrainage = false;
+            int lakeSeed = -1;
 
             for (int step = 0; step < maxSteps; step++)
             {
                 if (!visited.Add(current)) break;
                 path.Add(current);
 
-                if (elev[current] < sea) break;
+                if (elev[current] < sea || f.Lake[current] || (path.Count > 1 && flow[current] >= 128))
+                {
+                    reachesDrainage = true;
+                    break;
+                }
 
                 int cy = current / w;
                 int cx = current - cy * w;
@@ -581,13 +626,20 @@ public static class WorldGenerator
 
                 if (best < 0)
                 {
-                    // Landlocked local minimum: fill it into a lake basin.
-                    FloodLake(f, current, sea);
+                    lakeSeed = current;
+                    reachesDrainage = true;
                     break;
                 }
 
                 current = best;
             }
+
+            if (!reachesDrainage || path.Count < minRiverLength) continue;
+
+            if (lakeSeed >= 0) FloodLake(f, lakeSeed, sea);
+
+            sourceGrid[sourceCellY * sourceGridWidth + sourceCellX] = path[0];
+            acceptedRivers++;
 
             // Accumulate flow and carve a shallow channel.
             float volume = 0f;

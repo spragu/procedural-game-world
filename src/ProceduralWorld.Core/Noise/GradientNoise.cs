@@ -11,12 +11,6 @@ public sealed class GradientNoise
     private const float F2 = 0.366025403f; // 0.5 * (sqrt(3) - 1)
     private const float G2 = 0.211324865f; // (3 - sqrt(3)) / 6
 
-    private static readonly float[,] Grad2 =
-    {
-        { 1, 1 }, { -1, 1 }, { 1, -1 }, { -1, -1 },
-        { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
-    };
-
     private readonly byte[] _perm = new byte[512];
 
     public GradientNoise(int seed)
@@ -70,7 +64,18 @@ public sealed class GradientNoise
         float t = 0.5f - x * x - y * y;
         if (t < 0f) return 0f;
         t *= t;
-        return t * t * (Grad2[gi, 0] * x + Grad2[gi, 1] * y);
+        float gradient = gi switch
+        {
+            0 => x + y,
+            1 => -x + y,
+            2 => x - y,
+            3 => -x - y,
+            4 => x,
+            5 => -x,
+            6 => y,
+            _ => -y,
+        };
+        return t * t * gradient;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
